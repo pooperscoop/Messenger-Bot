@@ -91,7 +91,7 @@ app.post('/webhook', function (req, res) {
       var pageID = pageEntry.id;
       var timeOfEvent = pageEntry.time;
 
-      // Iterate over each messaging even t
+      // Iterate over each messaging event
       pageEntry.messaging.forEach(function(messagingEvent) {
         if (messagingEvent.optin) {
           receivedAuthentication(messagingEvent);
@@ -215,6 +215,16 @@ function receivedAuthentication(event) {
  * then we'll simply confirm that we've received the attachment.
  *
  */
+
+// function something(senderID) {
+//   return new Promise((resolve, reject) => {
+//     try {
+//       sendQuickReply(senderID);
+//       resolve();
+//     } catch(error){reject(error)}
+//   });
+// }
+
 function receivedMessage(event) {
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
@@ -257,6 +267,8 @@ function receivedMessage(event) {
     switch (messageText.replace(/[^\w\s]/gi, '').trim().toLowerCase()) {
       case 'hello':
       case 'hi':
+        console.log('msg hi received');
+        // sendQuickReply(senderID);
         sendHiMessage(senderID);
         break;
 
@@ -316,9 +328,18 @@ function receivedMessage(event) {
         sendTextMessage(senderID, messageText);
     }
   } else if (messageAttachments) {
-    sendTextMessage(senderID, "Message with attachment received").then((senderID) => {
-      sendQuickReply(senderID);
-    }).catch(console.err);
+    console.log("MSG ATT:", messageAttachments);
+    console.log("MSG ATT.type:", messageAttachments[0].type);    
+    if (messageAttachments[0].type == 'location') {
+      sendTextMessage(senderID, "Thanks for reporting this! ✅");
+    } else {
+      console.log('msg attachment received');
+      return sendQuickReply(senderID);
+    }
+      // sendQuickReply(senderID);
+      // sendHiMessage(senderID);
+      // break;
+      // sendQuickReply(senderID);
   }
 }
 
@@ -445,7 +466,7 @@ function sendHiMessage(recipientId) {
     },
     message: {
       text: `
-Congrats on setting up your Messenger Bot!
+Congrats on setting up your Messenger Botttttt!
 
 Right now, your bot can only respond to a few words. Try out "quick reply", "typing on", "button", or "image" to see how they work. You'll find a complete list of these commands in the "app.js" file. Anything else you type will just be mirrored until you create additional commands.
 
@@ -748,28 +769,17 @@ function sendQuickReply(recipientId) {
       id: recipientId
     },
     message: {
-      text: "What's your favorite movie genre?",
-      quick_replies: [
-        {
-          "content_type":"text",
-          "title":"Action",
-          "payload":"DEVELOPER_DEFINED_PAYLOAD_FOR_PICKING_ACTION"
-        },
-        {
-          "content_type":"text",
-          "title":"Comedy",
-          "payload":"DEVELOPER_DEFINED_PAYLOAD_FOR_PICKING_COMEDY"
-        },
-        {
-          "content_type":"text",
-          "title":"Drama",
-          "payload":"DEVELOPER_DEFINED_PAYLOAD_FOR_PICKING_DRAMA"
-        }
-      ]
+      text: "What's your location?",
+      quick_replies:
+        [{
+          "content_type":"location",
+        }]
     }
   };
-
-  callSendAPI(messageData);
+  console.log('got here');
+  console.log('messageData:', messageData);
+  
+  callSendAPI(messageData, recipientId);
 }
 
 /*
@@ -855,7 +865,7 @@ function sendAccountLinking(recipientId) {
  * get the message id in a response
  *
  */
-function callSendAPI(messageData) {
+function callSendAPI(messageData) {  
   request({
     uri: 'https://graph.facebook.com/v2.6/me/messages',
     qs: { access_token: PAGE_ACCESS_TOKEN },
