@@ -16,7 +16,10 @@ const
   crypto = require('crypto'),
   express = require('express'),
   https = require('https'),
-  request = require('request');
+  request = require('request'),
+  axios = require('axios'),
+  querystring = require('query-string');
+
 
 var app = express();
 app.set('port', process.env.PORT || 5000);
@@ -225,15 +228,17 @@ function receivedAuthentication(event) {
 //   });
 // }
 
+const users = {};
+
 function receivedMessage(event) {
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
   var timeOfMessage = event.timestamp;
   var message = event.message;
-
+  let mid = event.message.mid;
   console.log("Received message for user %d and page %d at %d with message:",
     senderID, recipientID, timeOfMessage);
-  console.log(JSON.stringify(message));
+  // console.log(JSON.stringify(message));
 
   var isEcho = message.is_echo;
   var messageId = message.mid;
@@ -245,6 +250,16 @@ function receivedMessage(event) {
   var messageAttachments = message.attachments;
   var quickReply = message.quick_reply;
 
+  if (!users[senderID]) {
+    users[senderID] = {
+      url: null,
+      long: null,
+      lat: null
+    };
+  }
+
+  console.log('users[senderID]:', users[senderID]);
+  
   if (isEcho) {
     // Just logging message echoes to console
     console.log("Received echo for message %s and app %d with metadata %s",
@@ -328,12 +343,52 @@ function receivedMessage(event) {
         sendTextMessage(senderID, messageText);
     }
   } else if (messageAttachments) {
-    console.log("MSG ATT:", messageAttachments);
-    console.log("MSG ATT.type:", messageAttachments[0].type);    
+    console.log('messageAttachments:', messageAttachments[0].payload);
+    
     if (messageAttachments[0].type == 'location') {
+      console.log("payload:", messageAttachments[0].payload.coordinates);
+      users[senderID].long = messageAttachments[0].payload.coordinates.long;
+      users[senderID].lat = messageAttachments[0].payload.coordinates.lat;
+      console.log('users[senderID]:', users[senderID]);
+
+      let config = {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "cityID": "5ca938d677d0070004db47a0"
+        }
+      }
+
+      let data = {
+        submittedBy: senderID,
+        longitude: users[senderID].long,
+        latitude: users[senderID].lat,
+        imageURL: users[senderID].url
+      }
+      // fetch.post(`https://poop-scooper.herokuapp.com/`, {
+      //   method: 'POST',
+      //   mode: 'cors',
+      //   cache: 'no-cache',
+      //   headers: {
+      //     "Content-Type": "application/x-www-form-urlencoded",
+      //     "cityID": "5ca938d677d0070004db47a0"
+      //   },
+      //   body: {submittedBy: senderID, longitude: users[senderID].long, latitude: users[senderID].lat, imageURL: users[senderID].url}
+      // });
+      // let's make the API Call right here!
+      // messageattachment
+      console.log('data:', data);
+      
+      axios.post("https://poop-scooper.herokuapp.com/loc/new", querystring.stringify(data), config);
       sendTextMessage(senderID, "Thanks for reporting this! ✅");
     } else {
-      console.log('msg attachment received');
+      console.log('image received');
+      const userImg = messageAttachments[0].payload.url;
+      console.log('userImg:', userImg);
+
+      users[senderID].url = userImg;
+      console.log('users[senderID]:', users[senderID]);
+      
+
       return sendQuickReply(senderID);
     }
       // sendQuickReply(senderID);
